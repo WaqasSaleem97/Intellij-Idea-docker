@@ -30,11 +30,16 @@ if [[ ! -f .env ]]; then
     fi
     (
         umask 077
-        printf 'PUID=%s\nPGID=%s\nWEBTOP_USER=waqas\nWEBTOP_PASSWORD=%s\nIDEA_VERSION=2026.2.3\n' \
+        printf 'PUID=%s\nPGID=%s\nWEBTOP_USER=admin\nWEBTOP_PASSWORD=%s\nIDEA_VERSION=2026.2.3\n' \
             "$(id -u)" "$(id -g)" "$webtop_password" > .env
     )
     unset webtop_password webtop_password_confirm
 else
+    # Upgrade the previous generated default while preserving custom logins.
+    if grep -qx 'WEBTOP_USER=waqas' .env; then
+        sed -i 's/^WEBTOP_USER=waqas$/WEBTOP_USER=admin/' .env
+        echo 'Updated browser login username to admin; password preserved.'
+    fi
     echo 'Using your existing .env configuration.'
 fi
 
@@ -52,5 +57,5 @@ docker compose build --pull
 docker compose up -d
 docker compose ps
 
-printf '\nBrowser username: waqas (or WEBTOP_USER from your existing .env).\n'
-printf 'Create the SSH tunnel described in README.md, then open https://localhost:3001.\n'
+printf '\nBrowser username: admin (or WEBTOP_USER from your existing .env).\n'
+printf 'Open https://localhost:3001 in your host computer browser.\n'

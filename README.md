@@ -1,10 +1,10 @@
-# IntelliJ IDEA in Docker on Oracle Ubuntu
+# IntelliJ IDEA in Docker on Ubuntu
 
-Prepared 22 October 2026. This custom image combines LinuxServer.io's Ubuntu
+Updated 25 October 2026. This custom image combines LinuxServer.io's Ubuntu
 XFCE Webtop desktop with JetBrains' native IntelliJ IDEA 2026.2.3 installer.
-It builds on Oracle Ampere ARM64 or AMD64 without cross-architecture emulation.
-The IDE, terminal, Java compiler, projects, and builds run on the Oracle server;
-you use the desktop through a browser on your computer.
+It builds on ARM64 or AMD64 without cross-architecture emulation.
+The IDE, terminal, Java compiler, projects and builds run in the container on
+your Ubuntu computer. Open its desktop through a browser on that same computer.
 
 LinuxServer's standalone `intellij-idea` image is currently AMD64-only. Its
 `webtop` image supports ARM64 and AMD64, including an `ubuntu-xfce` flavor.
@@ -13,16 +13,16 @@ JetBrains publishes an ARM64 Linux installer. Sources: [Webtop documentation][1]
 
 ## Requirements
 
-- Ubuntu server with Docker Engine and the Docker Compose plugin already working
-  for your normal login user. Check `docker info` and `docker compose version`.
+- Ubuntu computer with Docker Engine and the Docker Compose plugin working
+  for your normal login user.
 - ARM64 or AMD64; check `uname -m`.
-- Working SSH access from your computer to the server.
-- Outbound internet access for the base image, Ubuntu packages, and JetBrains
+- A browser on the same computer as the Docker host.
+- Outbound internet access for the base image, Ubuntu packages and JetBrains
   download. The IDE archive alone is about 1.6 GB; the full image is larger.
 - As a practical starting budget, leave 8 GB RAM and at least 20 GB free disk
-  available for this setup, image-building space, and a small project. This is a
+  available for this setup, image-building space and a small project. This is a
   suggested budget, not a measured requirement. JetBrains lists 4 CPU cores,
-  8 GB total RAM, 3 GB available for IDE processes, and 10 GB IDE disk space.[4]
+  8 GB total RAM, 3 GB available for IDE processes and 10 GB IDE disk space.[4]
 
 Setup calculates limits of 90% of the Docker host's CPU capacity and total RAM.
 On a 4-core/24-GiB server, that is 3.6 CPU cores and approximately 21.6 GiB RAM;
@@ -32,60 +32,41 @@ as needed and shares the host with other workloads. This does not reserve 10%
 for the OS or guarantee that 90% is currently free. Disk space and network
 bandwidth are not limited by this setting.[9]
 
-## 1. Copy and extract the package
+## 1. Clone and start the environment
 
-Download `intellij-oracle-docker.zip` to your computer. In Windows PowerShell,
-copy it to the server using your usual SSH key:
-
-```powershell
-scp -i "C:\path\oracle.key" "$HOME\Downloads\intellij-oracle-docker.zip" ubuntu@YOUR_SERVER_IP:~/
-```
-
-Replace the key path and server IP. If your SSH configuration already selects
-the key, omit `-i` and its path.
-
-In your server's SSH terminal:
+In your Ubuntu host terminal:
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y unzip
-unzip intellij-oracle-docker.zip
-cd intellij-oracle-docker
+git clone https://github.com/WaqasSaleem97/Intellij-Idea-docker.git
+cd Intellij-Idea-docker
 bash setup.sh
 ```
 
 Run `setup.sh` as your normal Ubuntu user. It asks for a browser password,
-records your UID/GID, creates the persistent project directory, builds the image,
-and starts the container. Use at least 8 letters/numbers for the password; this
-simple format avoids Compose interpolation and quoting mistakes. Credentials
-and other `.env` settings are kept on reruns. Setup initializes the 90% resource
-limits when any resource key is missing, including in older installations;
-once all three keys exist, later setup runs keep their values.
+records your UID/GID, creates the persistent project directory, builds the image
+and starts the container. Use at least 8 letters/numbers for the password.
 
+The default browser username is **admin**. Setup updates the previous generated
+default username to `admin` in an existing `.env` and keeps its password.
+Other custom usernames and existing resource settings are preserved.
+
+Setup initializes the 90% resource limits when any resource key is missing.
+Once all three resource keys exist, later setup runs keep their values.
 The first build downloads several GB. The Dockerfile checks the IDE archive
 against JetBrains' published SHA-256 checksum before extracting it.
 
-## 2. Open an SSH tunnel from your computer
+## 2. Open the desktop locally
 
-In Windows PowerShell, run:
+Open **https://localhost:3001** in your host computer's browser. Webtop serves a
+self-signed certificate by default. Acknowledge that notice for this local
+desktop address, then log in with username **admin** and your chosen password.
+Use your configured `WEBTOP_USER` instead if you have a custom login.
+Use HTTPS because the streaming client requires a secure context.[1]
 
-```powershell
-ssh -i "C:\path\oracle.key" -N -o ExitOnForwardFailure=yes -L 127.0.0.1:3001:127.0.0.1:3001 ubuntu@YOUR_SERVER_IP
-```
-
-Keep this terminal open. An idle terminal with no output is normal. The tunnel
-uses the server's existing SSH access; it does not require an Oracle ingress
-rule for port 3001. OpenSSH documents `-L` for local port forwarding.[5]
-
-Open **https://localhost:3001** in your computer's browser. Webtop serves a
-self-signed certificate by default. Acknowledge that warning for this local,
-SSH-tunnelled address, then log in with username **waqas** and your chosen
-password. Use HTTPS, because the streaming client requires a secure context.[1]
-
-The Compose mapping binds the service to the server's loopback address.
-Keep that mapping for this SSH access method. For public web access, use an
-authenticated HTTPS reverse proxy or a VPN; Webtop's maintainer advises against
-exposing its desktop directly with only the built-in basic authentication.[1][6]
+Compose publishes desktop port 3001 on the Docker host's loopback address.[6]
+For web applications running inside this desktop, open the browser inside the
+container. For example, a Node.js application listening on port 4000 is available
+there at `http://localhost:4000`.
 
 ## 3. Start IntelliJ and create a project
 
@@ -114,8 +95,8 @@ license.[4]
 ## Terminal username and hostname
 
 The Bash terminal prompt displays the host user who runs `docker compose up -d`
-with the container hostname `ubuntu`. For example, host user `waqas` sees
-`waqas@ubuntu:~$`, and host user `ubuntu` sees `ubuntu@ubuntu:~$`.
+with the container hostname `ubuntu`. For example, host user `admin` sees
+`admin@ubuntu:~$`, and host user `ubuntu` sees `ubuntu@ubuntu:~$`.
 Compose reads the username from the host's `SUDO_USER` when set, otherwise
 `USER`, with `ubuntu` as a fallback when neither is available.[7]
 
@@ -154,7 +135,7 @@ layer are not covered by this persistence mapping. Back up the `config` director
 
 ## Operation
 
-Run these from the package directory on the server:
+Run these from the repository directory on the Ubuntu host:
 
 ```bash
 # Status and logs
@@ -183,20 +164,14 @@ Do not use `docker compose pull` as the update mechanism for this custom image;
 rebuild it instead. The base image uses a rolling `ubuntu-xfce` tag, while the
 IDE version is pinned. Update the IDE through the Dockerfile build.
 
-If localhost port 3001 is already occupied on your computer, use local port 3002:
-
-```powershell
-ssh -i "C:\path\oracle.key" -N -o ExitOnForwardFailure=yes -L 127.0.0.1:3002:127.0.0.1:3001 ubuntu@YOUR_SERVER_IP
-```
-
-Then open `https://localhost:3002`. If port 3001 is occupied on the server,
-change the host port in Compose and the remote destination port in the tunnel
-to the same unused value.
+If desktop port 3001 is already occupied on the host, change its Compose mapping
+to `127.0.0.1:3002:3001`, run `docker compose up -d` and open
+`https://localhost:3002`.
 
 ## Allow up to 90% of host CPU and RAM
 
 For an existing installation, run these commands in the repository directory
-on the Oracle host, using your SSH terminal:
+on the Ubuntu host, using its terminal:
 
 ```bash
 git pull --ff-only
@@ -235,7 +210,7 @@ new keys, Compose keeps its previous fallback of 8 GiB RAM and uncapped CPU.[12]
 The Compose YAML and shell syntax were checked, and the architecture support,
 download URL, and access settings were checked against the primary sources
 below. Docker is unavailable in the preparation environment, so this image was
-not built or launched here, and it has not been deployed to your Oracle server.
+not built or launched here, and it has not been launched on your computer by this documentation update.
 The resource script was also checked with simulated Docker responses for the
 90% calculation, scoped live updates, credential preservation, and failure handling.
 
@@ -245,7 +220,6 @@ The resource script was also checked with simulated Docker responses for the
 2. [LinuxServer.io IntelliJ image: supported architectures][2]
 3. [JetBrains release API: current IntelliJ release and ARM64 download][3]
 4. [JetBrains IntelliJ installation, requirements, runtime, and licensing][4]
-5. [OpenSSH manual: local TCP forwarding][5]
 6. [Docker: port publishing and loopback bindings][6]
 7. [Docker Compose: interpolation from the host shell][7]
 8. [LinuxServer.io: custom initialization scripts][8]
@@ -258,7 +232,6 @@ The resource script was also checked with simulated Docker responses for the
 [2]: https://docs.linuxserver.io/images/docker-intellij-idea/
 [3]: https://data.services.jetbrains.com/products/releases?code=IIU&latest=true&type=release
 [4]: https://www.jetbrains.com/help/idea/installation-guide.html
-[5]: https://man.openbsd.org/ssh#L
 [6]: https://docs.docker.com/engine/network/port-publishing/
 [7]: https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/
 [8]: https://docs.linuxserver.io/general/container-customization/

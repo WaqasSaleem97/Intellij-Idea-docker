@@ -10,7 +10,7 @@ services:
       PGID: "${PGID:?Run bash setup.sh first}"
       TERMINAL_USER: "${SUDO_USER:-${USER:-ubuntu}}"
       TZ: "Asia/Karachi"
-      CUSTOM_USER: "${WEBTOP_USER:-waqas}"
+      CUSTOM_USER: "${WEBTOP_USER:-admin}"
       PASSWORD: "${WEBTOP_PASSWORD:?Run bash setup.sh first}"
     volumes:
       - ./config:/config
