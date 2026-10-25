@@ -81,6 +81,7 @@ fi
     "$project_dir/compose.yaml" \
     "$project_dir/Dockerfile" \
     "$project_dir/intellij-idea.desktop" \
+    "$project_dir/init-terminal.sh" \
     "$project_dir/setup.sh" \
     "$project_dir/README.md" \
     "$project_dir/.dockerignore" \

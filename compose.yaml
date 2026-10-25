@@ -4,9 +4,11 @@ services:
       context: .
       args:
         IDEA_VERSION: "${IDEA_VERSION:-2026.2.3}"
+    hostname: ubuntu
     environment:
       PUID: "${PUID:?Run bash setup.sh first}"
       PGID: "${PGID:?Run bash setup.sh first}"
+      TERMINAL_USER: "${SUDO_USER:-${USER:-ubuntu}}"
       TZ: "Asia/Karachi"
       CUSTOM_USER: "${WEBTOP_USER:-waqas}"
       PASSWORD: "${WEBTOP_PASSWORD:?Run bash setup.sh first}"

@@ -31,5 +31,6 @@ RUN set -eu; \
 ENV JAVA_HOME=/opt/jdk
 
 COPY intellij-idea.desktop /usr/share/applications/intellij-idea.desktop
+COPY --chmod=0755 init-terminal.sh /custom-cont-init.d/10-terminal-prompt
 
 # Retain Webtop's entrypoint, desktop session, and streaming services.

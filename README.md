@@ -105,6 +105,37 @@ IntelliJ's core features remain free; Ultimate-only features require the
 applicable subscription after the trial. This package does not provide a
 license.[4]
 
+## Terminal username and hostname
+
+The Bash terminal prompt displays the host user who runs `docker compose up -d`
+with the container hostname `ubuntu`. For example, host user `waqas` sees
+`waqas@ubuntu:~$`, and host user `ubuntu` sees `ubuntu@ubuntu:~$`.
+Compose reads the username from the host's `SUDO_USER` when set, otherwise
+`USER`, with `ubuntu` as a fallback when neither is available.[7]
+
+This is a prompt display setting. Webtop's desktop still runs as its built-in
+Linux account `abc`, so `whoami` returns `abc` and its home remains `/config`.
+Root shells retain their normal root prompt. Browser login credentials are
+configured separately through `WEBTOP_USER` and `WEBTOP_PASSWORD`.[1]
+
+The startup script updates a marked block in `/config/.bashrc`, including for
+existing installations, and preserves the rest of that file. It runs through
+LinuxServer's custom initialization hook before the desktop starts.[8]
+
+To apply this update to an existing installation, run from your repository
+directory:
+
+```bash
+git pull --ff-only
+docker compose up -d --build
+```
+
+Then open a new terminal in the browser desktop or IntelliJ. The rebuild is
+needed once to include the new startup script; subsequent starts can use
+`docker compose up -d`. Container recreation retains `/config`, but packages
+installed manually inside the previous container (such as Maven) must be
+reinstalled or included in your Dockerfile before recreation.
+
 ## Persistence
 
 The container's home directory is `/config`, backed by the package's `config`
@@ -170,6 +201,8 @@ not built or launched here, and it has not been deployed to your Oracle server.
 4. [JetBrains IntelliJ installation, requirements, runtime, and licensing][4]
 5. [OpenSSH manual: local TCP forwarding][5]
 6. [Docker: port publishing and loopback bindings][6]
+7. [Docker Compose: interpolation from the host shell][7]
+8. [LinuxServer.io: custom initialization scripts][8]
 
 [1]: https://docs.linuxserver.io/images/docker-webtop/
 [2]: https://docs.linuxserver.io/images/docker-intellij-idea/
@@ -177,3 +210,5 @@ not built or launched here, and it has not been deployed to your Oracle server.
 [4]: https://www.jetbrains.com/help/idea/installation-guide.html
 [5]: https://man.openbsd.org/ssh#L
 [6]: https://docs.docker.com/engine/network/port-publishing/
+[7]: https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/
+[8]: https://docs.linuxserver.io/general/container-customization/
