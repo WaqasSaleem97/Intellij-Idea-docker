@@ -1,0 +1,19 @@
+services:
+  intellij:
+    build:
+      context: .
+      args:
+        IDEA_VERSION: "${IDEA_VERSION:-2026.2.3}"
+    environment:
+      PUID: "${PUID:?Run bash setup.sh first}"
+      PGID: "${PGID:?Run bash setup.sh first}"
+      TZ: "Asia/Karachi"
+      CUSTOM_USER: "${WEBTOP_USER:-waqas}"
+      PASSWORD: "${WEBTOP_PASSWORD:?Run bash setup.sh first}"
+    volumes:
+      - ./config:/config
+    ports:
+      - "127.0.0.1:3001:3001"
+    shm_size: "1gb"
+    mem_limit: "${IDEA_MEMORY_LIMIT:-8g}"
+    restart: unless-stopped
