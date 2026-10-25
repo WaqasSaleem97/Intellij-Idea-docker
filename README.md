@@ -24,9 +24,13 @@ JetBrains publishes an ARM64 Linux installer. Sources: [Webtop documentation][1]
   suggested budget, not a measured requirement. JetBrains lists 4 CPU cores,
   8 GB total RAM, 3 GB available for IDE processes, and 10 GB IDE disk space.[4]
 
-For a 4-core/24-GB server, the included 8-GB container memory cap is a reasonable
-starting point if that much memory is free. CPU is not capped. Other containers,
-especially active LLM inference, can compete with the IDE for resources.
+Setup calculates limits of 90% of the Docker host's CPU capacity and total RAM.
+On a 4-core/24-GiB server, that is 3.6 CPU cores and approximately 21.6 GiB RAM;
+the exact RAM limit uses Docker's reported total and rounds down to whole MiB.
+These are usage ceilings, not reservations: the container consumes resources
+as needed and shares the host with other workloads. This does not reserve 10%
+for the OS or guarantee that 90% is currently free. Disk space and network
+bandwidth are not limited by this setting.[9]
 
 ## 1. Copy and extract the package
 
@@ -53,8 +57,10 @@ bash setup.sh
 Run `setup.sh` as your normal Ubuntu user. It asks for a browser password,
 records your UID/GID, creates the persistent project directory, builds the image,
 and starts the container. Use at least 8 letters/numbers for the password; this
-simple format avoids Compose interpolation and quoting mistakes. Existing `.env`
-settings are kept on reruns.
+simple format avoids Compose interpolation and quoting mistakes. Credentials
+and other `.env` settings are kept on reruns. Setup initializes the 90% resource
+limits when any resource key is missing, including in older installations;
+once all three keys exist, later setup runs keep their values.
 
 The first build downloads several GB. The Dockerfile checks the IDE archive
 against JetBrains' published SHA-256 checksum before extracting it.
@@ -163,8 +169,9 @@ docker compose start
 docker stats
 ```
 
-To change the memory cap or browser credentials, edit `.env`, then run
-`docker compose up -d`. To install a newer IntelliJ version, set `IDEA_VERSION`
+To change browser credentials, edit `.env`, then run `docker compose up -d`.
+For CPU/RAM limits, use the live-update instructions below. To install a newer
+IntelliJ version, set `IDEA_VERSION`
 to an available JetBrains unified-release version in `.env`, then run:
 
 ```bash
@@ -186,12 +193,51 @@ Then open `https://localhost:3002`. If port 3001 is occupied on the server,
 change the host port in Compose and the remote destination port in the tunnel
 to the same unused value.
 
+## Allow up to 90% of host CPU and RAM
+
+For an existing installation, run these commands in the repository directory
+on the Oracle host, using your SSH terminal:
+
+```bash
+git pull --ff-only
+bash resources.sh
+docker stats --no-stream "$(docker compose ps -q intellij)"
+```
+
+`resources.sh` reads the CPU count and total RAM from the Docker daemon. It
+replaces the old resource values in `.env`, preserving credentials and other
+settings, and applies them to this project's existing `intellij` container with
+`docker update`. A running container stays running, a stopped container stays
+stopped, and manually installed tools remain in place. There is no rebuild or
+container recreation for this resource update.[10]
+
+The script writes `IDEA_CPU_LIMIT`, `IDEA_MEMORY_LIMIT`, and
+`IDEA_MEMORY_SWAP_LIMIT`. The RAM+swap limit equals the RAM limit, disabling
+container swap to avoid disk swapping during heavy builds. The limits cover
+the entire container: IntelliJ, the desktop, Chromium, and Java builds together.
+They do not increase IntelliJ's own JVM heap setting.[9][11]
+
+CPU was previously uncapped; the 90% setting introduces a CPU ceiling. The
+increase is in the old 8-GiB RAM cap. If other services also need substantial
+RAM, this setting alone cannot prevent host memory pressure, and it does not
+continuously recalculate from currently free memory. Rerun `resources.sh` after
+resizing the server to recalculate from its new totals.
+
+Future `docker compose up -d` calls use the saved limits. Compose may recreate
+the container when it detects the changed configuration, even after a live
+update; use `docker compose stop` / `docker compose start` to stop or resume
+the same container. Normal recreation retains `/config` but loses manually
+installed packages outside it. Until setup or `resources.sh` has configured the
+new keys, Compose keeps its previous fallback of 8 GiB RAM and uncapped CPU.[12]
+
 ## Validation scope
 
 The Compose YAML and shell syntax were checked, and the architecture support,
 download URL, and access settings were checked against the primary sources
 below. Docker is unavailable in the preparation environment, so this image was
 not built or launched here, and it has not been deployed to your Oracle server.
+The resource script was also checked with simulated Docker responses for the
+90% calculation, scoped live updates, credential preservation, and failure handling.
 
 ## Sources
 
@@ -203,6 +249,10 @@ not built or launched here, and it has not been deployed to your Oracle server.
 6. [Docker: port publishing and loopback bindings][6]
 7. [Docker Compose: interpolation from the host shell][7]
 8. [LinuxServer.io: custom initialization scripts][8]
+9. [Docker: CPU, memory, and swap constraints][9]
+10. [Docker: updating a running container's limits][10]
+11. [Docker Compose: service CPU, memory, and swap settings][11]
+12. [Docker Compose: when up recreates containers][12]
 
 [1]: https://docs.linuxserver.io/images/docker-webtop/
 [2]: https://docs.linuxserver.io/images/docker-intellij-idea/
@@ -212,3 +262,7 @@ not built or launched here, and it has not been deployed to your Oracle server.
 [6]: https://docs.docker.com/engine/network/port-publishing/
 [7]: https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/
 [8]: https://docs.linuxserver.io/general/container-customization/
+[9]: https://docs.docker.com/engine/containers/resource_constraints/
+[10]: https://docs.docker.com/reference/cli/docker/container/update/
+[11]: https://docs.docker.com/reference/compose-file/services/
+[12]: https://docs.docker.com/reference/cli/docker/compose/up/

@@ -30,12 +30,20 @@ if [[ ! -f .env ]]; then
     fi
     (
         umask 077
-        printf 'PUID=%s\nPGID=%s\nWEBTOP_USER=waqas\nWEBTOP_PASSWORD=%s\nIDEA_VERSION=2026.2.3\nIDEA_MEMORY_LIMIT=8g\n' \
+        printf 'PUID=%s\nPGID=%s\nWEBTOP_USER=waqas\nWEBTOP_PASSWORD=%s\nIDEA_VERSION=2026.2.3\n' \
             "$(id -u)" "$(id -g)" "$webtop_password" > .env
     )
     unset webtop_password webtop_password_confirm
 else
     echo 'Using your existing .env configuration.'
+fi
+
+# Set the new default once, including when upgrading an older 8g configuration.
+# On later setup runs, retain the already configured resource limits.
+if ! grep -Eq '^IDEA_CPU_LIMIT=.+' .env \
+    || ! grep -Eq '^IDEA_MEMORY_LIMIT=.+' .env \
+    || ! grep -Eq '^IDEA_MEMORY_SWAP_LIMIT=.+' .env; then
+    bash resources.sh --configure-only
 fi
 
 mkdir -p config/IdeaProjects

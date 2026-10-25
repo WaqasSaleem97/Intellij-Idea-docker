@@ -83,6 +83,7 @@ fi
     "$project_dir/intellij-idea.desktop" \
     "$project_dir/init-terminal.sh" \
     "$project_dir/setup.sh" \
+    "$project_dir/resources.sh" \
     "$project_dir/README.md" \
     "$project_dir/.dockerignore" \
     "$project_dir/.gitignore" \

@@ -17,5 +17,7 @@ services:
     ports:
       - "127.0.0.1:3001:3001"
     shm_size: "1gb"
+    cpus: "${IDEA_CPU_LIMIT:-0}"
     mem_limit: "${IDEA_MEMORY_LIMIT:-8g}"
+    memswap_limit: "${IDEA_MEMORY_SWAP_LIMIT:-0}"
     restart: unless-stopped
