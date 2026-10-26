@@ -1,6 +1,6 @@
 # IntelliJ IDEA in Docker on Ubuntu
 
-Updated 25 October 2026. This custom image combines LinuxServer.io's Ubuntu
+Updated 26 October 2026. This custom image combines LinuxServer.io's Ubuntu
 XFCE Webtop desktop with JetBrains' native IntelliJ IDEA 2026.2.3 installer.
 It builds on ARM64 or AMD64 without cross-architecture emulation.
 The IDE, terminal, Java compiler, projects and builds run in the container on
@@ -123,6 +123,44 @@ needed once to include the new startup script; subsequent starts can use
 installed manually inside the previous container (such as Maven) must be
 reinstalled or included in your Dockerfile before recreation.
 
+## Run Docker commands from IntelliJ
+
+The Webtop base image already includes Docker.[14] Compose shares the Ubuntu
+host's `/var/run/docker.sock` with the container, so commands in the desktop or
+IntelliJ terminal manage the host's images and containers.
+
+In the **IntelliJ terminal**, run:
+
+```bash
+sudo docker images
+sudo docker ps
+```
+
+Use `sudo` because the socket is normally owned by root and the host's Docker
+group; the desktop account may not belong to that group.[13]
+
+To apply the socket mount to an **existing installation**, save your work and
+run these commands from the repository directory in your **Ubuntu host terminal**:
+
+```bash
+git pull origin main
+sudo systemctl start docker
+docker compose up -d --force-recreate intellij
+```
+
+Reopen `https://localhost:3001`, launch IntelliJ and run `sudo docker images`
+again. This socket-only update does not require an image rebuild. Recreation
+keeps projects and settings under `/config`; packages installed manually
+outside that directory must be reinstalled.
+
+If Docker reports that `/var/run/docker.sock` does not exist, check that you
+applied the update from the host and recreated the container. A permission
+error calls for `sudo docker images` inside IntelliJ.
+
+Access to this socket gives the desktop container root-level control through
+the host's Docker Engine.[13] This configuration uses the standard Ubuntu
+Docker Engine socket and shares the host's Docker installation.[14]
+
 ## Persistence
 
 The container's home directory is `/config`, backed by the package's `config`
@@ -227,6 +265,8 @@ The resource script was also checked with simulated Docker responses for the
 10. [Docker: updating a running container's limits][10]
 11. [Docker Compose: service CPU, memory, and swap settings][11]
 12. [Docker Compose: when up recreates containers][12]
+13. [Docker: socket ownership and Docker access privileges][13]
+14. [LinuxServer.io: Docker included in the base image and host socket access][14]
 
 [1]: https://docs.linuxserver.io/images/docker-webtop/
 [2]: https://docs.linuxserver.io/images/docker-intellij-idea/
@@ -239,3 +279,5 @@ The resource script was also checked with simulated Docker responses for the
 [10]: https://docs.docker.com/reference/cli/docker/container/update/
 [11]: https://docs.docker.com/reference/compose-file/services/
 [12]: https://docs.docker.com/reference/cli/docker/compose/up/
+[13]: https://docs.docker.com/engine/install/linux-postinstall/
+[14]: https://docs.linuxserver.io/images/docker-baseimage-selkies/#docker-in-docker-dind
