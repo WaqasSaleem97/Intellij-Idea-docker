@@ -67,8 +67,12 @@ fi
 delete_files=(rm)
 if (( EUID != 0 )); then
     command -v sudo >/dev/null || fail 'sudo is required to remove container-owned files.'
-    sudo -v
-    delete_files=(sudo rm)
+    # Check the actual cleanup command: sudo -v has different password rules.
+    # sudo skips authentication when allowed and prompts when a password is needed.
+    delete_files=(sudo -- rm)
+    if ! "${delete_files[@]}" --help >/dev/null; then
+        fail 'Could not obtain sudo permission for cleanup. Nothing was removed.'
+    fi
 fi
 
 if ! "${compose[@]}" down --rmi local --volumes; then
