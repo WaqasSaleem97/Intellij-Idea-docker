@@ -4,6 +4,7 @@ services:
       context: .
       args:
         IDEA_VERSION: "${IDEA_VERSION:-2026.2.3}"
+        INSTALL_BROWSER: "${INSTALL_BROWSER:-true}"
     hostname: ubuntu
     environment:
       PUID: "${PUID:?Run bash setup.sh first}"
@@ -12,13 +13,22 @@ services:
       TZ: "Asia/Karachi"
       CUSTOM_USER: "${WEBTOP_USER:-admin}"
       PASSWORD: "${WEBTOP_PASSWORD:?Run bash setup.sh first}"
+      IDEA_HEAP_MB: "${IDEA_HEAP_MB:-1024}"
+      SELKIES_FRAMERATE: "${IDEA_FRAMERATE:-20,8-30}"
+      SELKIES_VIDEO_STREAMING_MODE: "false"
+      SELKIES_AUDIO_ON_START: "false"
     volumes:
       - ./config:/config
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "127.0.0.1:3001:3001"
     shm_size: "1gb"
-    cpus: "${IDEA_CPU_LIMIT:-0}"
-    mem_limit: "${IDEA_MEMORY_LIMIT:-8g}"
-    memswap_limit: "${IDEA_MEMORY_SWAP_LIMIT:-0}"
+    cpus: "${IDEA_CPU_LIMIT:-2}"
+    mem_limit: "${IDEA_MEMORY_LIMIT:-4g}"
+    memswap_limit: "${IDEA_MEMORY_SWAP_LIMIT:-4g}"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: unless-stopped

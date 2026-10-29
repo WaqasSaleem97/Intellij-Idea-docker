@@ -1,0 +1,59 @@
+name: Validate IntelliJ image
+
+on:
+  push:
+    paths:
+      - 'Dockerfile'
+      - 'compose.yaml'
+      - '*.sh'
+      - '*.desktop'
+      - '.dockerignore'
+      - 'root/**'
+      - 'tests/**'
+      - '.github/workflows/validate.yml'
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - 'compose.yaml'
+      - '*.sh'
+      - '*.desktop'
+      - '.dockerignore'
+      - 'root/**'
+      - 'tests/**'
+      - '.github/workflows/validate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-smoke:
+    name: Build and launch (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check scripts and resource helpers
+        run: |
+          find . -name '*.sh' -not -path './.git/*' -exec bash -n {} \;
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Check Compose configuration
+        env:
+          PUID: '1001'
+          PGID: '1001'
+          WEBTOP_PASSWORD: SmokeDemoOnly123
+        run: docker compose config --quiet
+      - name: Build native image
+        run: docker build --progress=plain -t intellij-lean:ci .
+      - name: Launch and check the desktop
+        run: bash tests/smoke.sh intellij-lean:ci

@@ -2,3 +2,9 @@
 !Dockerfile
 !intellij-idea.desktop
 !init-terminal.sh
+!idea-launcher.sh
+!browser.sh
+!root/
+!root/defaults/
+!root/defaults/startwm.sh
+!root/defaults/menu.xml

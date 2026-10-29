@@ -44,8 +44,8 @@ else
     echo 'The existing browser password is unchanged. To choose a new one, run bash reset-login.sh.'
 fi
 
-# Set the new default once, including when upgrading an older 8g configuration.
-# On later setup runs, retain the already configured resource limits.
+# New installs use the light profile. Existing explicit limits are preserved;
+# use bash resources.sh --light to apply the smaller budget to an existing setup.
 if ! grep -Eq '^IDEA_CPU_LIMIT=.+' .env \
     || ! grep -Eq '^IDEA_MEMORY_LIMIT=.+' .env \
     || ! grep -Eq '^IDEA_MEMORY_SWAP_LIMIT=.+' .env; then

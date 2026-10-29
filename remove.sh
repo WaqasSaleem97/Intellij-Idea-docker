@@ -22,8 +22,8 @@ if [[ "$project_dir" == "$(readlink -f -- "${HOME:?}")" ]]; then
 fi
 [[ -f "$project_dir/compose.yaml" && -f "$project_dir/Dockerfile" ]] \
     || fail 'Expected compose.yaml and Dockerfile beside remove.sh.'
-grep -Fqx 'FROM lscr.io/linuxserver/webtop:ubuntu-xfce' "$project_dir/Dockerfile" \
-    || fail 'This does not look like the supplied IntelliJ Webtop package.'
+grep -Eq '^FROM (lscr.io/linuxserver/webtop:ubuntu-xfce|ghcr.io/linuxserver/baseimage-selkies:ubunturesolute)$' "$project_dir/Dockerfile" \
+    || fail 'This does not look like the supplied IntelliJ package.'
 [[ ! -L "$config_dir" ]] || fail 'config is a symbolic link; its external data needs manual review.'
 
 # Refuse to recursively delete a mounted directory, including bind mounts.
@@ -86,6 +86,10 @@ fi
     "$project_dir/Dockerfile" \
     "$project_dir/intellij-idea.desktop" \
     "$project_dir/init-terminal.sh" \
+    "$project_dir/idea-launcher.sh" \
+    "$project_dir/browser.sh" \
+    "$project_dir/root/defaults/startwm.sh" \
+    "$project_dir/root/defaults/menu.xml" \
     "$project_dir/setup.sh" \
     "$project_dir/resources.sh" \
     "$project_dir/reset-login.sh" \
@@ -93,6 +97,8 @@ fi
     "$project_dir/.dockerignore" \
     "$project_dir/.gitignore" \
     "$script_path"
+
+rmdir -- "$project_dir/root/defaults" "$project_dir/root" 2>/dev/null || true
 
 cd -- /tmp
 if rmdir -- "$project_dir" 2>/dev/null; then
