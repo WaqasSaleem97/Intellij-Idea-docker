@@ -1,40 +1,37 @@
 # IntelliJ IDEA in Docker on Ubuntu
 
-Updated 29 October 2026. This custom image combines LinuxServer.io's Ubuntu
-XFCE Webtop desktop with JetBrains' native IntelliJ IDEA 2026.2.3 installer.
-It builds on ARM64 or AMD64 without cross-architecture emulation.
-The IDE, terminal, Java compiler, projects and builds run in the container on
-your Ubuntu computer. Open its desktop through a browser on that same computer.
+Updated 29 October 2026. Run IntelliJ IDEA 2026.2.3 through your browser with an Ubuntu container, an Openbox desktop, Git, a headless JDK 21 and Chromium. Native **ARM64 and AMD64** builds are supported, including Oracle Ampere hosts.
 
-LinuxServer's standalone `intellij-idea` image is currently AMD64-only. Its
-`webtop` image supports ARM64 and AMD64, including an `ubuntu-xfce` flavor.
-JetBrains publishes an ARM64 Linux installer. Sources: [Webtop documentation][1],
-[standalone image architecture table][2], [JetBrains release metadata][3].
+## What uses less storage and resources
+
+The image uses **`ghcr.io/linuxserver/baseimage-selkies:ubunturesolute`**, which supplies streaming and Openbox without the full XFCE application bundle.[1][2] LinuxServer's ready-made IntelliJ image is AMD64-only, so it does not cover the Oracle ARM64 setup.[3]
+
+| Setting | Previous setup | Current default |
+| --- | --- | --- |
+| Desktop | Ubuntu Webtop with XFCE | Ubuntu Selkies base with Openbox |
+| Development JDK | `openjdk-21-jdk` | `openjdk-21-jdk-headless`, including `javac` |
+| Container CPU ceiling | 90% of host CPUs after setup | At most 2 cores, or 90% on smaller hosts |
+| Container RAM ceiling | 90% of host RAM after setup | At most 4 GiB, or 75% on smaller hosts |
+| IntelliJ maximum Java heap | Vendor default | 1024 MiB, configurable |
+| Streaming frame rate | Upstream default | Starts at 20 FPS; adjustable from 8 to 30 |
+| Browser | Included | Included; can be omitted at build time |
+| Container logs | Docker daemon default | Rotated local logs, 10 MiB × 3 files |
+
+The image leaves out XFCE's session/panel, PDF and image viewers, file manager and archive tools. IntelliJ opens automatically; Chromium starts when you open it. Audio capture starts off and can be enabled in the streaming sidebar.[2][5]
+
+CPU/RAM values are **limits, not reservations or measured idle usage**. The IDE, browser, streaming and build tools share the container budget. The Java heap is only one part of IDE memory use. Small course projects are the intended workload; larger projects can use the performance profile or custom limits.[4][6] The full IntelliJ application and its bundled JetBrains Runtime remain installed.
 
 ## Requirements
 
-- Ubuntu computer with Docker Engine and the Docker Compose plugin working
-  for your normal login user.
-- ARM64 or AMD64; check `uname -m`.
-- A browser on the same computer as the Docker host.
-- Outbound internet access for the base image, Ubuntu packages and JetBrains
-  download. The IDE archive alone is about 1.6 GB; the full image is larger.
-- As a practical starting budget, leave 8 GB RAM and at least 20 GB free disk
-  available for this setup, image-building space and a small project. This is a
-  suggested budget, not a measured requirement. JetBrains lists 4 CPU cores,
-  8 GB total RAM, 3 GB available for IDE processes and 10 GB IDE disk space.[4]
+- Ubuntu host with Docker Engine and the Docker Compose plugin working for your normal login user.
+- ARM64 or AMD64 (`uname -m`).
+- At least 3 GiB available to the Docker host for the light profile. An 8-GB or larger host is more comfortable for the IDE and builds.
+- Allow about 20 GB free working disk for image construction, retained images, dependency caches and projects. This is a planning allowance, not the final image size.
+- Internet access for the base image, packages and JetBrains installer.
 
-Setup calculates limits of 90% of the Docker host's CPU capacity and total RAM.
-On a 4-core/24-GiB server, that is 3.6 CPU cores and approximately 21.6 GiB RAM;
-the exact RAM limit uses Docker's reported total and rounds down to whole MiB.
-These are usage ceilings, not reservations: the container consumes resources
-as needed and shares the host with other workloads. This does not reserve 10%
-for the OS or guarantee that 90% is currently free. Disk space and network
-bandwidth are not limited by this setting.[9]
+## 1. Clone and start
 
-## 1. Clone and start the environment
-
-In your Ubuntu host terminal:
+In your **Ubuntu host terminal**:
 
 ```bash
 git clone https://github.com/WaqasSaleem97/Intellij-Idea-docker.git
@@ -42,291 +39,182 @@ cd Intellij-Idea-docker
 bash setup.sh
 ```
 
-Run `setup.sh` as your normal Ubuntu user. It asks for a browser password,
-records your UID/GID, creates the persistent project directory, builds the image
-and starts the container. Use at least 8 letters/numbers for the password.
+Run setup as your normal Ubuntu account, without `sudo`. Choose and repeat a browser password of at least 8 letters/numbers. The default browser username is **`admin`**. This password is separate from your Ubuntu SSH/sudo password.
 
-The default browser username is **admin**. Setup updates the previous generated
-default username to `admin` in an existing `.env` and keeps its password.
-Other custom usernames and existing resource settings are preserved.
-Setup prints the username configured in the running container. Rerunning setup
-with an existing `.env` keeps the old browser password; it does not ask for a
-new one. The browser password is separate from your Ubuntu SSH/sudo password.
+New installations get the light limits. Setup preserves explicit resource values in an existing `.env`; use the upgrade instructions to change an older 90% configuration. Existing passwords and custom browser usernames are retained. The previous generated default username is migrated to `admin`.
 
-Setup initializes the 90% resource limits when any resource key is missing.
-Once all three resource keys exist, later setup runs keep their values.
-The first build downloads several GB. The Dockerfile checks the IDE archive
-against JetBrains' published SHA-256 checksum before extracting it.
+The build selects the native JetBrains installer and verifies its SHA-256 checksum before extraction. The compressed installer is removed in the same layer. The IDE version stays pinned; the base tag receives upstream updates when rebuilt with `--pull`.
 
-## 2. Open the desktop locally
+## 2. Upgrade an existing installation
 
-Open **https://localhost:3001** in your host computer's browser. Webtop serves a
-self-signed certificate by default. Acknowledge that notice for this local
-desktop address, then log in with username **admin** and your chosen password.
-Use your configured `WEBTOP_USER` instead if you have a custom login.
-Use HTTPS because the streaming client requires a secure context.[1]
-
-Compose publishes desktop port 3001 on the Docker host's loopback address.[6]
-For web applications running inside this desktop, open the browser inside the
-container. For example, a Node.js application listening on port 4000 is available
-there at `http://localhost:4000`.
-
-## 3. Start IntelliJ and create a project
-
-In the browser desktop, find **IntelliJ IDEA** in the applications menu, or open
-the desktop's terminal and run:
+Save your work. From the repository directory in the **Ubuntu host terminal**:
 
 ```bash
-idea
+git pull origin main
+docker compose stop intellij
+bash resources.sh --light --configure-only
+bash setup.sh
 ```
 
-Run this command in the browser desktop terminal so it has access to the
-graphical session. Complete JetBrains' first-run screens.
+This rebuilds the smaller image and recreates the service using its existing credentials. Stopping first avoids reducing an active IDE's memory budget. **Projects and settings under `/config` are retained. Packages installed manually elsewhere, such as Maven, need reinstalling after recreation.** Include tools in the Dockerfile if they must survive future recreation.[1][7]
 
-- Create or clone projects under **/config/IdeaProjects**.
-- For Java projects, select **JDK 21**. If it is not detected, choose **Add JDK**
-  and select **/opt/jdk**.
-- The image includes Git and OpenJDK 21. The IDE retains its bundled JetBrains
-  Runtime. Add Maven/Gradle wrappers to projects that need those build tools.
-- If an IDE shortcut is intercepted by your browser, use the IDE menu or adjust
-  that shortcut.
+Old images and build cache can remain on disk after rebuilding. Setup does not delete other projects' images, containers or data.
 
-IntelliJ's core features remain free; Ultimate-only features require the
-applicable subscription after the trial. This package does not provide a
-license.[4]
+## 3. Open the desktop and projects
+
+Open **https://localhost:3001** in your host browser, acknowledge the local self-signed certificate notice, and sign in as `admin` with your chosen password. Use `WEBTOP_USER` for a custom login. HTTPS is required for the streaming browser features.[1]
+
+IntelliJ opens automatically. **Right-click the empty desktop**, or press **Alt+F1** inside the session, for the **Development** menu: IntelliJ IDEA, Terminal and Browser. Alt+F1 also opens the menu when the IDE covers the desktop. Run `idea` in the desktop terminal to reopen the IDE.
+
+- Create or clone projects under **`/config/IdeaProjects`**.
+- For Java 21 projects, select **JDK 21**, or add **`/opt/jdk`** as the project SDK. The compiler is included; no `JAVA_HOME` exports are needed.
+- Use the JDK required by each project's build-tool version. Older Gradle wrappers can need an older JDK; IntelliJ can download project SDKs separately.
+- Open **Browser** from the menu, or run `browser` in the desktop terminal. A container application listening on port 4000 is available there at **http://localhost:4000**. Only desktop port 3001 is published to host loopback.
+
+Free core features and subscription/trial requirements follow JetBrains' licensing.[8]
+
+## Resource profiles
+
+From the repository directory on the **Docker host**:
+
+```bash
+# Light is the default: cap at 2 CPU cores and 4 GiB RAM.
+bash resources.sh --light
+
+# Optional: allow up to 90% of the host CPU and RAM.
+bash resources.sh --performance
+
+# Inspect current usage.
+docker stats --no-stream
+```
+
+Light uses the smaller of 2 cores and 90% of host CPU capacity, and the smaller of 4096 MiB and 75% of host RAM. It requires a calculated RAM budget of at least 2048 MiB. A 4-core/24-GiB host gets **2 cores / 4 GiB**; a 2-core/4-GiB host gets **1.8 cores / 3 GiB**.
+
+The script queries the Docker daemon, preserves credentials and other settings, validates Compose, and updates only this installation's container. It saves limits in `.env` without restarting or recreating the container. **Save work and stop the desktop before lowering a busy IDE's budget.** If Docker rejects the update, `.env` is unchanged. Add `--configure-only` to save limits without updating a container.
+
+Host Docker builds started through the shared socket run outside the IDE container; these CPU/RAM limits do not cap the host daemon or its separate build containers.
+
+Both profiles disable container swap by setting the RAM+swap allowance equal to RAM.[6] Performance mode changes the container budget, not the IDE heap.
+
+### IDE heap and display settings
+
+Optional settings in `.env`:
+
+```dotenv
+IDEA_HEAP_MB=1536
+IDEA_FRAMERATE=20,8-30
+```
+
+Save work and run `docker compose up -d` to apply changes; this can recreate the container. The launcher retains the vendor's VM options and changes only `-Xms`/`-Xmx` in `/config/.cache/intellij-docker/idea64.vmoptions`. An explicitly supplied container `IDEA_VM_OPTIONS` takes priority.[4] Use `.env` to adjust the managed heap: a custom options file created through the IDE is overridden while this launcher manages the options.
+
+For slower connections, select a smaller resolution in the streaming sidebar and close unused browser tabs. Frame rate affects streaming, not Java compilation.[5]
+
+## Optional image without Chromium
+
+Chromium is included for the course's browser-inside-container tasks. If it is not needed, set this in `.env` before building:
+
+```dotenv
+INSTALL_BROWSER=false
+```
+
+Run `docker compose build --pull`, then `docker compose up -d`. This omits the browser package at build time. Set the value back to `true` and rebuild to restore it.
 
 ## Terminal username and hostname
 
-The Bash terminal prompt displays the host user who runs `docker compose up -d`
-with the container hostname `ubuntu`. For example, host user `admin` sees
-`admin@ubuntu:~$`, and host user `ubuntu` sees `ubuntu@ubuntu:~$`.
-Compose reads the username from the host's `SUDO_USER` when set, otherwise
-`USER`, with `ubuntu` as a fallback when neither is available.[7]
+The terminal prompt displays the host user who runs Compose with hostname `ubuntu`, for example `admin@ubuntu:~$`. Compose reads `SUDO_USER`, then `USER`, then falls back to `ubuntu`.[9] The actual desktop account remains `abc`, with home `/config`; `whoami` returns `abc`. Browser credentials are separate.
 
-This is a prompt display setting. Webtop's desktop still runs as its built-in
-Linux account `abc`, so `whoami` returns `abc` and its home remains `/config`.
-Root shells retain their normal root prompt. Browser login credentials are
-configured separately through `WEBTOP_USER` and `WEBTOP_PASSWORD`.[1]
-
-The startup script updates a marked block in `/config/.bashrc`, including for
-existing installations, and preserves the rest of that file. It runs through
-LinuxServer's custom initialization hook before the desktop starts.[8]
-
-To apply this update to an existing installation, run from your repository
-directory:
-
-```bash
-git pull --ff-only
-docker compose up -d --build
-```
-
-Then open a new terminal in the browser desktop or IntelliJ. The rebuild is
-needed once to include the new startup script; subsequent starts can use
-`docker compose up -d`. Container recreation retains `/config`, but packages
-installed manually inside the previous container (such as Maven) must be
-reinstalled or included in your Dockerfile before recreation.
+The initialization script replaces only its marked prompt block in `.bashrc`. Other content and root-shell prompts are preserved.
 
 ## Run Docker commands from IntelliJ
 
-The Webtop base image already includes Docker.[14] Compose shares the Ubuntu
-host's `/var/run/docker.sock` with the container, so commands in the desktop or
-IntelliJ terminal manage the host's images and containers.
-
-In the **IntelliJ terminal**, run:
+The base includes Docker. Compose mounts the host's `/var/run/docker.sock`, so these commands in **IntelliJ's terminal** use the host Docker Engine:[1]
 
 ```bash
+docker --version
 sudo docker images
 sudo docker ps
 ```
 
-Use `sudo` because the socket is normally owned by root and the host's Docker
-group; the desktop account may not belong to that group.[13]
+Use `sudo` for socket permissions. Socket access gives the desktop host-level Docker control.[10] An extra daemon is not started in the container. If an older installation reports a missing socket, apply the upgrade instructions from the Ubuntu host.
 
-To apply the socket mount to an **existing installation**, save your work and
-run these commands from the repository directory in your **Ubuntu host terminal**:
+## Fix or reset browser login
+
+Rerunning setup keeps an existing `.env` password. To choose a new one, save work and run from the repository directory on the Ubuntu host:
 
 ```bash
 git pull origin main
-sudo systemctl start docker
-docker compose up -d --force-recreate intellij
-```
-
-Reopen `https://localhost:3001`, launch IntelliJ and run `sudo docker images`
-again. This socket-only update does not require an image rebuild. Recreation
-keeps projects and settings under `/config`; packages installed manually
-outside that directory must be reinstalled.
-
-If Docker reports that `/var/run/docker.sock` does not exist, check that you
-applied the update from the host and recreated the container. A permission
-error calls for `sudo docker images` inside IntelliJ.
-
-Access to this socket gives the desktop container root-level control through
-the host's Docker Engine.[13] This configuration uses the standard Ubuntu
-Docker Engine socket and shares the host's Docker installation.[14]
-
-## Persistence
-
-The container's home directory is `/config`, backed by the package's `config`
-folder on your server. Projects under `/config/IdeaProjects`, IDE settings,
-plugins, and normal home-directory caches persist when the container is
-recreated.[1]
-
-Keep new work under `/config`. Files saved elsewhere in the container's writable
-layer are not covered by this persistence mapping. Back up the `config` directory.
-
-## Operation
-
-Run these from the repository directory on the Ubuntu host:
-
-```bash
-# Status and logs
-docker compose ps
-docker compose logs --tail=100 intellij
-
-# Stop or resume
-docker compose stop
-docker compose start
-
-# See current resource usage
-docker stats
-```
-
-To reset browser credentials, use `bash reset-login.sh` as described below.
-For CPU/RAM limits, use the live-update instructions below. To install a newer
-IntelliJ version, set `IDEA_VERSION`
-to an available JetBrains unified-release version in `.env`, then run:
-
-```bash
-docker compose build --pull
-docker compose up -d
-```
-
-Do not use `docker compose pull` as the update mechanism for this custom image;
-rebuild it instead. The base image uses a rolling `ubuntu-xfce` tag, while the
-IDE version is pinned. Update the IDE through the Dockerfile build.
-
-If desktop port 3001 is already occupied on the host, change its Compose mapping
-to `127.0.0.1:3002:3001`, run `docker compose up -d` and open
-`https://localhost:3002`.
-
-## Fix or reset the browser login
-
-If `admin` and your password are rejected, the existing `.env` or container may
-still use different credentials. Pulling the repository does not replace your
-local `.env`. The `CUSTOM_USER` and `PASSWORD` variables in the container control
-Webtop's HTTP basic authentication.[1]
-
-Save your work, then run these commands from the repository directory in your
-Ubuntu host terminal (or your SSH terminal when using a remote Oracle host):
-
-```bash
-git pull --ff-only
 bash reset-login.sh
 ```
 
-The script asks for a new password of at least 8 letters/numbers, sets the browser
-username to `admin`, and replaces only the browser credential entries in `.env`.
-It preserves other settings and keeps `.env` readable only by its owner.
-It recreates only the `intellij` service using its existing image, without an
-image rebuild or download. A plain restart cannot apply changed environment
-variables.[12][15]
+The script sets username `admin`, replaces only browser credentials, and recreates this service with its existing image. It preserves other settings and keeps `.env` at mode 600. It verifies HTTP 401 for anonymous requests and HTTP 200 for the new credentials, without printing the password. Recreation preserves `/config`; manually installed packages elsewhere are lost.
 
-**Recreation keeps projects and settings under `/config`, but removes packages
-and files installed manually elsewhere in the container.** Include tools in
-your Dockerfile if they need to survive recreation.
+After **Browser login verified successfully**, use a private/InPrivate browser window to avoid cached credentials. On a remote Oracle host, keep using your existing tunnel and desktop URL. Verification checks the service inside the container; a remaining failure can involve the URL, tunnel or cache.
 
-The script waits for the web server and confirms that anonymous requests receive
-HTTP 401 while `admin` with the new password receives HTTP 200. It never prints
-your password. If verification fails, it reports the HTTP status and exits with
-an error instead of claiming that login works.
+If the script reports shell overrides, run `unset WEBTOP_USER WEBTOP_PASSWORD` before future Compose commands. The host shell can override `.env` values.[9] Do not share `.env` or passwords.
 
-After it prints **Browser login verified successfully**, open your desktop URL
-in a new private/InPrivate browser window and log in as `admin` with the new
-password. For a remote host, keep using your existing SSH tunnel and desktop URL.
-The verification checks the service inside the container; a remaining browser
-failure can involve cached credentials or a URL/tunnel reaching another service.
+## Persistence, storage and operation
 
-If the script reports shell credential overrides, run
-`unset WEBTOP_USER WEBTOP_PASSWORD` before future Compose commands so that the
-saved `.env` values take effect.[7] Do not post `.env` or your password when
-sharing diagnostic output.
+The host's `./config` is mounted as `/config`. Projects, settings, plugins, home-directory dependency caches and downloaded SDKs there survive recreation. Files elsewhere are outside this persistence mapping. Back up `config` before replacing or removing an installation.[1]
 
-## Allow up to 90% of host CPU and RAM
-
-For an existing installation, run these commands in the repository directory
-on the Ubuntu host, using its terminal:
+From the repository directory on the host:
 
 ```bash
-git pull --ff-only
-bash resources.sh
-docker stats --no-stream "$(docker compose ps -q intellij)"
+docker compose ps
+docker compose logs --tail=100 intellij
+docker compose stop
+docker compose start
+
+# Inspect disk use without removing anything.
+docker system df
+du -sh config
+docker image ls
 ```
 
-`resources.sh` reads the CPU count and total RAM from the Docker daemon. It
-replaces the old resource values in `.env`, preserving credentials and other
-settings, and applies them to this project's existing `intellij` container with
-`docker update`. A running container stays running, a stopped container stays
-stopped, and manually installed tools remain in place. There is no rebuild or
-container recreation for this resource update.[10]
+Rotated local logging bounds future container-log growth.[11] Projects and dependency caches can still grow. After verifying the replacement, remove an old image explicitly with `docker image rm <unused-old-image-id>` if it is no longer needed. Docker refuses removal while a container uses it. Rebuilds also leave build cache; deleting shared volumes is not needed to reduce IDE image storage.
 
-The script writes `IDEA_CPU_LIMIT`, `IDEA_MEMORY_LIMIT`, and
-`IDEA_MEMORY_SWAP_LIMIT`. The RAM+swap limit equals the RAM limit, disabling
-container swap to avoid disk swapping during heavy builds. The limits cover
-the entire container: IntelliJ, the desktop, Chromium, and Java builds together.
-They do not increase IntelliJ's own JVM heap setting.[9][11]
+To update IntelliJ, set an available `IDEA_VERSION` in `.env`, run `docker compose build --pull`, then `docker compose up -d`. A plain restart cannot change the container environment.[7] For an occupied desktop port, change the mapping to `127.0.0.1:3002:3001` and open `https://localhost:3002`.
 
-CPU was previously uncapped; the 90% setting introduces a CPU ceiling. The
-increase is in the old 8-GiB RAM cap. If other services also need substantial
-RAM, this setting alone cannot prevent host memory pressure, and it does not
-continuously recalculate from currently free memory. Rerun `resources.sh` after
-resizing the server to recalculate from its new totals.
+## Validation
 
-Future `docker compose up -d` calls use the saved limits. Compose may recreate
-the container when it detects the changed configuration, even after a live
-update; use `docker compose stop` / `docker compose start` to stop or resume
-the same container. Normal recreation retains `/config` but loses manually
-installed packages outside it. Until setup or `resources.sh` has configured the
-new keys, Compose keeps its previous fallback of 8 GiB RAM and uncapped CPU.[12]
+```bash
+python3 -m unittest discover -s tests -p 'test_*.py' -v
+```
 
-## Validation scope
+The [native ARM64 and AMD64 build checks](https://github.com/WaqasSaleem97/Intellij-Idea-docker/actions/runs/40915152416) passed on 29 October 2026. Each image ran under a **2-core / 4-GiB** limit. Checks covered authentication, graphical IntelliJ and Chromium windows, the 1024-MiB heap setting, Java tools and host Docker access.
 
-The Compose YAML and shell syntax were checked, and the architecture support,
-download URL, and access settings were checked against the primary sources
-below. Docker is unavailable in the preparation environment, so this image was
-not built or launched here, and it has not been launched on your computer by this documentation update.
-The resource script was also checked with simulated Docker responses for the
-90% calculation, scoped live updates, credential preservation, and failure handling.
-The login reset was checked with simulated Docker/HTTP responses for credential
-replacement, password mismatch, startup/authentication failures, and verification.
+| Architecture | Image size, uncompressed | Initial memory sample, IDE and Chromium open |
+| --- | --- | --- |
+| AMD64 | 8.04 GB | 663.8 MiB |
+| ARM64 | 8.03 GB | 828.6 MiB |
+
+An [unchanged AMD64 baseline build](https://github.com/WaqasSaleem97/Intellij-Idea-docker/actions/runs/40916411973) of the previous Dockerfile measured **8.50 GB**, compared with **8.04 GB** for this image: about **457 MB (5.4%) less uncompressed image storage** with Chromium included. The reduction is modest because IntelliJ and its bundled runtime account for much of the installation. Removing the optional browser can reduce the image further; that variant is not included in these measurements.
+
+These are initial smoke-test samples before opening projects, not peak or steady-state measurements. Indexing, builds, plugins and additional tabs can use more memory. Image size excludes build cache and `/config`; it can change with upstream base/package updates.
+
+The workflow repeats build and startup checks for changes to the image or scripts. See [workflow runs](https://github.com/WaqasSaleem97/Intellij-Idea-docker/actions/workflows/validate.yml).
 
 ## Sources
 
-1. [LinuxServer.io Webtop: architecture, images, access, and persistence][1]
-2. [LinuxServer.io IntelliJ image: supported architectures][2]
-3. [JetBrains release API: current IntelliJ release and ARM64 download][3]
-4. [JetBrains IntelliJ installation, requirements, runtime, and licensing][4]
-6. [Docker: port publishing and loopback bindings][6]
-7. [Docker Compose: interpolation from the host shell][7]
-8. [LinuxServer.io: custom initialization scripts][8]
-9. [Docker: CPU, memory, and swap constraints][9]
-10. [Docker: updating a running container's limits][10]
-11. [Docker Compose: service CPU, memory, and swap settings][11]
-12. [Docker Compose: when up recreates containers][12]
-13. [Docker: socket ownership and Docker access privileges][13]
-14. [LinuxServer.io: Docker included in the base image and host socket access][14]
-15. [Docker Compose: restart retains the existing environment][15]
+1. [LinuxServer.io Selkies base images and persistence][1]
+2. [LinuxServer.io custom images and Openbox startup][2]
+3. [LinuxServer.io IntelliJ architecture support][3]
+4. [JetBrains custom VM options and Java heap][4]
+5. [Selkies streaming settings][5]
+6. [Docker CPU, memory and swap limits][6]
+7. [Docker Compose recreation and changed configuration][7]
+8. [JetBrains IntelliJ installation and requirements][8]
+9. [Docker Compose environment interpolation][9]
+10. [Docker socket permissions and privileges][10]
+11. [Docker local logging and rotation][11]
 
-[1]: https://docs.linuxserver.io/images/docker-webtop/
-[2]: https://docs.linuxserver.io/images/docker-intellij-idea/
-[3]: https://data.services.jetbrains.com/products/releases?code=IIU&latest=true&type=release
-[4]: https://www.jetbrains.com/help/idea/installation-guide.html
-[6]: https://docs.docker.com/engine/network/port-publishing/
-[7]: https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/
-[8]: https://docs.linuxserver.io/general/container-customization/
-[9]: https://docs.docker.com/engine/containers/resource_constraints/
-[10]: https://docs.docker.com/reference/cli/docker/container/update/
-[11]: https://docs.docker.com/reference/compose-file/services/
-[12]: https://docs.docker.com/reference/cli/docker/compose/up/
-[13]: https://docs.docker.com/engine/install/linux-postinstall/
-[14]: https://docs.linuxserver.io/images/docker-baseimage-selkies/#docker-in-docker-dind
-[15]: https://docs.docker.com/reference/cli/docker/compose/restart/
+[1]: https://docs.linuxserver.io/images/docker-baseimage-selkies/
+[2]: https://docs.linuxserver.io/selkies/developer-guide/building-images/
+[3]: https://docs.linuxserver.io/images/docker-intellij-idea/
+[4]: https://www.jetbrains.com/help/idea/tuning-the-ide.html
+[5]: https://docs.linuxserver.io/selkies/user-guide/configuration/
+[6]: https://docs.docker.com/engine/containers/resource_constraints/
+[7]: https://docs.docker.com/reference/cli/docker/compose/up/
+[8]: https://www.jetbrains.com/help/idea/installation-guide.html
+[9]: https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/
+[10]: https://docs.docker.com/engine/install/linux-postinstall/
+[11]: https://docs.docker.com/engine/logging/drivers/local/
