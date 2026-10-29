@@ -1,6 +1,6 @@
 # IntelliJ IDEA in Docker on Ubuntu
 
-Updated 26 October 2026. This custom image combines LinuxServer.io's Ubuntu
+Updated 29 October 2026. This custom image combines LinuxServer.io's Ubuntu
 XFCE Webtop desktop with JetBrains' native IntelliJ IDEA 2026.2.3 installer.
 It builds on ARM64 or AMD64 without cross-architecture emulation.
 The IDE, terminal, Java compiler, projects and builds run in the container on
@@ -49,6 +49,9 @@ and starts the container. Use at least 8 letters/numbers for the password.
 The default browser username is **admin**. Setup updates the previous generated
 default username to `admin` in an existing `.env` and keeps its password.
 Other custom usernames and existing resource settings are preserved.
+Setup prints the username configured in the running container. Rerunning setup
+with an existing `.env` keeps the old browser password; it does not ask for a
+new one. The browser password is separate from your Ubuntu SSH/sudo password.
 
 Setup initializes the 90% resource limits when any resource key is missing.
 Once all three resource keys exist, later setup runs keep their values.
@@ -188,7 +191,7 @@ docker compose start
 docker stats
 ```
 
-To change browser credentials, edit `.env`, then run `docker compose up -d`.
+To reset browser credentials, use `bash reset-login.sh` as described below.
 For CPU/RAM limits, use the live-update instructions below. To install a newer
 IntelliJ version, set `IDEA_VERSION`
 to an available JetBrains unified-release version in `.env`, then run:
@@ -205,6 +208,48 @@ IDE version is pinned. Update the IDE through the Dockerfile build.
 If desktop port 3001 is already occupied on the host, change its Compose mapping
 to `127.0.0.1:3002:3001`, run `docker compose up -d` and open
 `https://localhost:3002`.
+
+## Fix or reset the browser login
+
+If `admin` and your password are rejected, the existing `.env` or container may
+still use different credentials. Pulling the repository does not replace your
+local `.env`. The `CUSTOM_USER` and `PASSWORD` variables in the container control
+Webtop's HTTP basic authentication.[1]
+
+Save your work, then run these commands from the repository directory in your
+Ubuntu host terminal (or your SSH terminal when using a remote Oracle host):
+
+```bash
+git pull --ff-only
+bash reset-login.sh
+```
+
+The script asks for a new password of at least 8 letters/numbers, sets the browser
+username to `admin`, and replaces only the browser credential entries in `.env`.
+It preserves other settings and keeps `.env` readable only by its owner.
+It recreates only the `intellij` service using its existing image, without an
+image rebuild or download. A plain restart cannot apply changed environment
+variables.[12][15]
+
+**Recreation keeps projects and settings under `/config`, but removes packages
+and files installed manually elsewhere in the container.** Include tools in
+your Dockerfile if they need to survive recreation.
+
+The script waits for the web server and confirms that anonymous requests receive
+HTTP 401 while `admin` with the new password receives HTTP 200. It never prints
+your password. If verification fails, it reports the HTTP status and exits with
+an error instead of claiming that login works.
+
+After it prints **Browser login verified successfully**, open your desktop URL
+in a new private/InPrivate browser window and log in as `admin` with the new
+password. For a remote host, keep using your existing SSH tunnel and desktop URL.
+The verification checks the service inside the container; a remaining browser
+failure can involve cached credentials or a URL/tunnel reaching another service.
+
+If the script reports shell credential overrides, run
+`unset WEBTOP_USER WEBTOP_PASSWORD` before future Compose commands so that the
+saved `.env` values take effect.[7] Do not post `.env` or your password when
+sharing diagnostic output.
 
 ## Allow up to 90% of host CPU and RAM
 
@@ -251,6 +296,8 @@ below. Docker is unavailable in the preparation environment, so this image was
 not built or launched here, and it has not been launched on your computer by this documentation update.
 The resource script was also checked with simulated Docker responses for the
 90% calculation, scoped live updates, credential preservation, and failure handling.
+The login reset was checked with simulated Docker/HTTP responses for credential
+replacement, password mismatch, startup/authentication failures, and verification.
 
 ## Sources
 
@@ -267,6 +314,7 @@ The resource script was also checked with simulated Docker responses for the
 12. [Docker Compose: when up recreates containers][12]
 13. [Docker: socket ownership and Docker access privileges][13]
 14. [LinuxServer.io: Docker included in the base image and host socket access][14]
+15. [Docker Compose: restart retains the existing environment][15]
 
 [1]: https://docs.linuxserver.io/images/docker-webtop/
 [2]: https://docs.linuxserver.io/images/docker-intellij-idea/
@@ -281,3 +329,4 @@ The resource script was also checked with simulated Docker responses for the
 [12]: https://docs.docker.com/reference/cli/docker/compose/up/
 [13]: https://docs.docker.com/engine/install/linux-postinstall/
 [14]: https://docs.linuxserver.io/images/docker-baseimage-selkies/#docker-in-docker-dind
+[15]: https://docs.docker.com/reference/cli/docker/compose/restart/

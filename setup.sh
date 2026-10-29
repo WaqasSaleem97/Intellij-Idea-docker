@@ -41,6 +41,7 @@ else
         echo 'Updated browser login username to admin; password preserved.'
     fi
     echo 'Using your existing .env configuration.'
+    echo 'The existing browser password is unchanged. To choose a new one, run bash reset-login.sh.'
 fi
 
 # Set the new default once, including when upgrading an older 8g configuration.
@@ -57,5 +58,7 @@ docker compose build --pull
 docker compose up -d
 docker compose ps
 
-printf '\nBrowser username: admin (or WEBTOP_USER from your existing .env).\n'
+printf '\nBrowser username configured in the container: '
+docker compose exec -T intellij printenv CUSTOM_USER
 printf 'Open https://localhost:3001 in your host computer browser.\n'
+printf 'Use the browser password from setup; the Ubuntu SSH/sudo password is separate.\n'
