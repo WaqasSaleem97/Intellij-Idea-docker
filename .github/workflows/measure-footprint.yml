@@ -1,0 +1,22 @@
+name: Measure original image storage
+
+on:
+  push:
+    branches: [measure-footprint-20261029]
+    paths: ['.github/workflows/measure-footprint.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  original-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build the unchanged original image
+        run: docker build --progress=plain -t intellij-original:ci .
+      - name: Report original image storage
+        run: docker image inspect intellij-original:ci --format '{{.Size}}'
