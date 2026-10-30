@@ -77,4 +77,4 @@ printf '\nImage storage (bytes):\n'
 docker image inspect "$image" --format '{{.Size}}'
 printf '\nSampled container usage with IntelliJ and Chromium open:\n'
 docker stats --no-stream --format '{{.CPUPerc}} CPU; {{.MemUsage}} RAM' "$container"
-printf '\nPASS: authentication, IntelliJ/Chromium GUI, 90% resource budget, vendor VM options, Java tools and host Docker access.\n'
+printf '\n%s\n' 'PASS: authentication, IntelliJ/Chromium GUI, 90% resource budget, vendor VM options, Java tools and host Docker access.'
