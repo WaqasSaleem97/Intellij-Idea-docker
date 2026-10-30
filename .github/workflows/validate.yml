@@ -52,7 +52,10 @@ jobs:
           PUID: '1001'
           PGID: '1001'
           WEBTOP_PASSWORD: SmokeDemoOnly123
-        run: docker compose config --quiet
+        run: |
+          printf 'PUID=%s\nPGID=%s\nWEBTOP_PASSWORD=%s\n' "$PUID" "$PGID" "$WEBTOP_PASSWORD" > .env
+          bash resources.sh --configure-only
+          docker compose config --quiet
       - name: Build native image
         run: docker build --progress=plain -t intellij-lean:ci .
       - name: Launch and check the desktop

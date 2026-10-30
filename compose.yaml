@@ -13,8 +13,8 @@ services:
       TZ: "Asia/Karachi"
       CUSTOM_USER: "${WEBTOP_USER:-admin}"
       PASSWORD: "${WEBTOP_PASSWORD:?Run bash setup.sh first}"
-      IDEA_HEAP_MB: "${IDEA_HEAP_MB:-1024}"
-      SELKIES_FRAMERATE: "${IDEA_FRAMERATE:-20,8-30}"
+      IDEA_HEAP_MB: "${IDEA_HEAP_MB:-}"
+      SELKIES_FRAMERATE: "${IDEA_FRAMERATE:-}"
       SELKIES_VIDEO_STREAMING_MODE: "false"
       SELKIES_AUDIO_ON_START: "false"
     volumes:
@@ -23,9 +23,9 @@ services:
     ports:
       - "127.0.0.1:3001:3001"
     shm_size: "1gb"
-    cpus: "${IDEA_CPU_LIMIT:-2}"
-    mem_limit: "${IDEA_MEMORY_LIMIT:-4g}"
-    memswap_limit: "${IDEA_MEMORY_SWAP_LIMIT:-4g}"
+    cpus: "${IDEA_CPU_LIMIT:?Run bash setup.sh first}"
+    mem_limit: "${IDEA_MEMORY_LIMIT:?Run bash setup.sh first}"
+    memswap_limit: "${IDEA_MEMORY_SWAP_LIMIT:?Run bash setup.sh first}"
     logging:
       driver: local
       options:

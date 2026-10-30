@@ -3,10 +3,10 @@ set -euo pipefail
 
 idea_install_dir="${IDEA_INSTALL_DIR:-/opt/idea}"
 
-# An explicit options file takes priority. Otherwise retain vendor options and
-# change only the initial/maximum heap for small teaching projects.
-if [[ -z "${IDEA_VM_OPTIONS:-}" ]]; then
-    heap_mib="${IDEA_HEAP_MB:-1024}"
+# Keep the vendor/user VM options by default. Generate a heap override only
+# when explicitly requested, and honour a supplied options file first.
+if [[ -z "${IDEA_VM_OPTIONS:-}" && -n "${IDEA_HEAP_MB:-}" ]]; then
+    heap_mib="$IDEA_HEAP_MB"
     if [[ ! "$heap_mib" =~ ^[1-9][0-9]{2,4}$ ]] \
         || (( heap_mib < 512 || heap_mib > 32768 )); then
         echo 'IDEA_HEAP_MB must be an integer from 512 to 32768.' >&2

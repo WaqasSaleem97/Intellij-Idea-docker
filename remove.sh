@@ -46,6 +46,11 @@ if [[ ! -f .env ]]; then
     export WEBTOP_PASSWORD="${WEBTOP_PASSWORD:-removal-only-placeholder}"
 fi
 
+# Resource values are irrelevant to removal but must parse if setup was incomplete.
+export IDEA_CPU_LIMIT="${IDEA_CPU_LIMIT:-0}"
+export IDEA_MEMORY_LIMIT="${IDEA_MEMORY_LIMIT:-0}"
+export IDEA_MEMORY_SWAP_LIMIT="${IDEA_MEMORY_SWAP_LIMIT:-0}"
+
 compose=(docker compose --project-directory "$project_dir" -f "$project_dir/compose.yaml")
 services="$("${compose[@]}" config --services)"
 [[ "$services" == 'intellij' ]] \

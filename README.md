@@ -1,8 +1,8 @@
 # IntelliJ IDEA in Docker on Ubuntu
 
-Updated 29 October 2026. Run IntelliJ IDEA 2026.2.3 through your browser with an Ubuntu container, an Openbox desktop, Git, a headless JDK 21 and Chromium. Native **ARM64 and AMD64** builds are supported, including Oracle Ampere hosts.
+Updated 30 October 2026. Run IntelliJ IDEA 2026.2.3 through your browser with an Ubuntu container, an Openbox desktop, Git, a headless JDK 21 and Chromium. Native **ARM64 and AMD64** builds are supported, including Oracle Ampere hosts.
 
-## What uses less storage and resources
+## Smaller image with 90% resource access
 
 The image uses **`ghcr.io/linuxserver/baseimage-selkies:ubunturesolute`**, which supplies streaming and Openbox without the full XFCE application bundle.[1][2] LinuxServer's ready-made IntelliJ image is AMD64-only, so it does not cover the Oracle ARM64 setup.[3]
 
@@ -10,22 +10,22 @@ The image uses **`ghcr.io/linuxserver/baseimage-selkies:ubunturesolute`**, which
 | --- | --- | --- |
 | Desktop | Ubuntu Webtop with XFCE | Ubuntu Selkies base with Openbox |
 | Development JDK | `openjdk-21-jdk` | `openjdk-21-jdk-headless`, including `javac` |
-| Container CPU ceiling | 90% of host CPUs after setup | At most 2 cores, or 90% on smaller hosts |
-| Container RAM ceiling | 90% of host RAM after setup | At most 4 GiB, or 75% on smaller hosts |
-| IntelliJ maximum Java heap | Vendor default | 1024 MiB, configurable |
-| Streaming frame rate | Upstream default | Starts at 20 FPS; adjustable from 8 to 30 |
+| Container CPU ceiling | 90% of host CPUs after setup | 90% of host CPUs after setup |
+| Container RAM ceiling | 90% of host RAM after setup | 90% of host RAM after setup |
+| IntelliJ maximum Java heap | Vendor/user configuration | Vendor/user configuration; no project-imposed heap cap |
+| Streaming frame rate | Upstream default | Upstream default; no project frame-rate cap |
 | Browser | Included | Included; can be omitted at build time |
 | Container logs | Docker daemon default | Rotated local logs, 10 MiB × 3 files |
 
 The image leaves out XFCE's session/panel, PDF and image viewers, file manager and archive tools. IntelliJ opens automatically; Chromium starts when you open it. Audio capture starts off and can be enabled in the streaming sidebar.[2][5]
 
-CPU/RAM values are **limits, not reservations or measured idle usage**. The IDE, browser, streaming and build tools share the container budget. The Java heap is only one part of IDE memory use. Small course projects are the intended workload; larger projects can use the performance profile or custom limits.[4][6] The full IntelliJ application and its bundled JetBrains Runtime remain installed.
+CPU/RAM values are **limits, not reservations or measured idle usage**. The IDE, browser, streaming and build tools share the container budget. The Java heap is only one part of IDE memory use. Setup allows up to 90% of the CPU capacity and total RAM reported by Docker, without fixed 2-core/4-GiB ceilings. IntelliJ uses its normal vendor/user VM configuration unless you explicitly request an override.[4][6] The full IntelliJ application and its bundled JetBrains Runtime remain installed.
 
 ## Requirements
 
 - Ubuntu host with Docker Engine and the Docker Compose plugin working for your normal login user.
 - ARM64 or AMD64 (`uname -m`).
-- At least 3 GiB available to the Docker host for the light profile. An 8-GB or larger host is more comfortable for the IDE and builds.
+- An 8-GB or larger host is a comfortable starting point for the IDE and builds. Resource allowances scale with the capacity reported by Docker.
 - Allow about 20 GB free working disk for image construction, retained images, dependency caches and projects. This is a planning allowance, not the final image size.
 - Internet access for the base image, packages and JetBrains installer.
 
@@ -41,7 +41,7 @@ bash setup.sh
 
 Run setup as your normal Ubuntu account, without `sudo`. Choose and repeat a browser password of at least 8 letters/numbers. The default browser username is **`admin`**. This password is separate from your Ubuntu SSH/sudo password.
 
-New installations get the light limits. Setup preserves explicit resource values in an existing `.env`; use the upgrade instructions to change an older 90% configuration. Existing passwords and custom browser usernames are retained. The previous generated default username is migrated to `admin`.
+Setup calculates the 90% CPU/RAM allowance on every run, including when upgrading an older light-profile configuration. Existing browser passwords, custom usernames and other settings are retained. The previous generated default username is migrated to `admin`.
 
 The build selects the native JetBrains installer and verifies its SHA-256 checksum before extraction. The compressed installer is removed in the same layer. The IDE version stays pinned; the base tag receives upstream updates when rebuilt with `--pull`.
 
@@ -51,12 +51,10 @@ Save your work. From the repository directory in the **Ubuntu host terminal**:
 
 ```bash
 git pull origin main
-docker compose stop intellij
-bash resources.sh --light --configure-only
 bash setup.sh
 ```
 
-This rebuilds the smaller image and recreates the service using its existing credentials. Stopping first avoids reducing an active IDE's memory budget. **Projects and settings under `/config` are retained. Packages installed manually elsewhere, such as Maven, need reinstalling after recreation.** Include tools in the Dockerfile if they must survive future recreation.[1][7]
+This rebuilds the smaller image, refreshes the 90% resource allowance and recreates the service using its existing credentials. **Projects and settings under `/config` are retained. Packages installed manually elsewhere, such as Maven, need reinstalling after recreation.** Include tools in the Dockerfile if they must survive future recreation.[1][7]
 
 Old images and build cache can remain on disk after rebuilding. Setup does not delete other projects' images, containers or data.
 
@@ -73,41 +71,40 @@ IntelliJ opens automatically. **Right-click the empty desktop**, or press **Alt+
 
 Free core features and subscription/trial requirements follow JetBrains' licensing.[8]
 
-## Resource profiles
+## CPU and RAM: 90% by default
 
 From the repository directory on the **Docker host**:
 
 ```bash
-# Light is the default: cap at 2 CPU cores and 4 GiB RAM.
-bash resources.sh --light
-
-# Optional: allow up to 90% of the host CPU and RAM.
-bash resources.sh --performance
+# Apply 90% of the host CPU capacity and total RAM.
+bash resources.sh
 
 # Inspect current usage.
 docker stats --no-stream
 ```
 
-Light uses the smaller of 2 cores and 90% of host CPU capacity, and the smaller of 4096 MiB and 75% of host RAM. It requires a calculated RAM budget of at least 2048 MiB. A 4-core/24-GiB host gets **2 cores / 4 GiB**; a 2-core/4-GiB host gets **1.8 cores / 3 GiB**.
+The script queries the Docker daemon and calculates 90% of its CPU count and total RAM, rounded down to whole MiB for memory. On a 4-core/24-GiB host this allows **3.6 CPU cores and about 21.6 GiB RAM**. It uses the total capacity available to Docker; it does not continually recalculate from currently free RAM.
 
-The script queries the Docker daemon, preserves credentials and other settings, validates Compose, and updates only this installation's container. It saves limits in `.env` without restarting or recreating the container. **Save work and stop the desktop before lowering a busy IDE's budget.** If Docker rejects the update, `.env` is unchanged. Add `--configure-only` to save limits without updating a container.
+It preserves credentials and other settings, validates Compose, and updates only this installation's container. Limits are saved in `.env` without restarting or recreating the container. If Docker rejects the update, `.env` is unchanged. Add `--configure-only` to save the allowance without updating a container. The previous `--performance` argument remains a compatibility alias for the same 90% behavior.
 
-Host Docker builds started through the shared socket run outside the IDE container; these CPU/RAM limits do not cap the host daemon or its separate build containers.
+The fixed light profile has been removed. Running setup refreshes older 2-core/4-GiB configurations automatically. Compose requires calculated resource values from setup instead of falling back to fixed ceilings.
 
-Both profiles disable container swap by setting the RAM+swap allowance equal to RAM.[6] Performance mode changes the container budget, not the IDE heap.
+Host Docker builds started through the shared socket run outside the IDE container; the IDE service's resource settings do not cap the host daemon or its separate build containers.
 
-### IDE heap and display settings
+Container swap is disabled by setting the RAM+swap allowance equal to RAM.[6] Save work before changing the budget of a busy IDE.
 
-Optional settings in `.env`:
+### IDE heap and streaming settings
+
+There is no default project override for the IDE heap or streaming frame rate. Leave these optional `.env` values unset or empty to use the vendor/user VM options and upstream streaming defaults:
 
 ```dotenv
-IDEA_HEAP_MB=1536
-IDEA_FRAMERATE=20,8-30
+IDEA_HEAP_MB=
+IDEA_FRAMERATE=
 ```
 
-Save work and run `docker compose up -d` to apply changes; this can recreate the container. The launcher retains the vendor's VM options and changes only `-Xms`/`-Xmx` in `/config/.cache/intellij-docker/idea64.vmoptions`. An explicitly supplied container `IDEA_VM_OPTIONS` takes priority.[4] Use `.env` to adjust the managed heap: a custom options file created through the IDE is overridden while this launcher manages the options.
+If you previously entered an explicit low value, remove it or leave it empty to restore those defaults. An existing generated file under `/config/.cache/intellij-docker` is ignored unless a heap override is explicitly requested.
 
-For slower connections, select a smaller resolution in the streaming sidebar and close unused browser tabs. Frame rate affects streaming, not Java compilation.[5]
+You can still set `IDEA_HEAP_MB` to opt into a custom heap in MiB, or supply a container `IDEA_VM_OPTIONS` file. The latter takes priority. With neither set, IntelliJ handles its normal VM options, including a custom file created through **Help → Edit Custom VM Options**.[4] Save work and run `docker compose up -d` after changing container environment settings; this can recreate the container.
 
 ## Optional image without Chromium
 
@@ -180,18 +177,11 @@ To update IntelliJ, set an available `IDEA_VERSION` in `.env`, run `docker compo
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
-The [native ARM64 and AMD64 build checks](https://github.com/WaqasSaleem97/Intellij-Idea-docker/actions/runs/40915152416) passed on 29 October 2026. Each image ran under a **2-core / 4-GiB** limit. Checks covered authentication, graphical IntelliJ and Chromium windows, the 1024-MiB heap setting, Java tools and host Docker access.
-
-| Architecture | Image size, uncompressed | Initial memory sample, IDE and Chromium open |
-| --- | --- | --- |
-| AMD64 | 8.04 GB | 663.8 MiB |
-| ARM64 | 8.03 GB | 828.6 MiB |
+The workflow builds native AMD64 and ARM64 images, validates Compose and the 90% resource calculation, launches graphical IntelliJ and Chromium windows, checks authentication and host Docker access, and verifies that the default launcher leaves vendor VM options untouched. See [workflow runs](https://github.com/WaqasSaleem97/Intellij-Idea-docker/actions/workflows/validate.yml).
 
 An [unchanged AMD64 baseline build](https://github.com/WaqasSaleem97/Intellij-Idea-docker/actions/runs/40916411973) of the previous Dockerfile measured **8.50 GB**, compared with **8.04 GB** for this image: about **457 MB (5.4%) less uncompressed image storage** with Chromium included. The reduction is modest because IntelliJ and its bundled runtime account for much of the installation. Removing the optional browser can reduce the image further; that variant is not included in these measurements.
 
-These are initial smoke-test samples before opening projects, not peak or steady-state measurements. Indexing, builds, plugins and additional tabs can use more memory. Image size excludes build cache and `/config`; it can change with upstream base/package updates.
-
-The workflow repeats build and startup checks for changes to the image or scripts. See [workflow runs](https://github.com/WaqasSaleem97/Intellij-Idea-docker/actions/workflows/validate.yml).
+The storage comparison was measured on 29 October 2026. It excludes build cache and `/config`; sizes can change with upstream base/package updates.
 
 ## Sources
 
