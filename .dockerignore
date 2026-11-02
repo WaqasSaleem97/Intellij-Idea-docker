@@ -8,3 +8,5 @@
 !root/defaults/
 !root/defaults/startwm.sh
 !root/defaults/menu.xml
+!keys/
+!keys/xtradeb-apps.asc

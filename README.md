@@ -49,6 +49,16 @@ On the first build, the installer download can be about 1.5 GB. After `idea-…t
 
 If extraction stops making progress, use a second Ubuntu host terminal to check available storage with `df -h /` and memory with `free -h`. Keep any actual error output for troubleshooting. A missing Buildx plugin warning can report a fallback to the classic builder while the build continues. Look for an actual error and the last operation shown before diagnosing a failed build.
 
+### Chromium repository connectivity
+
+An error from `add-apt-repository` ending in `OSError: [Errno 101] Network is unreachable` can occur while that helper contacts Launchpad's API, even after Ubuntu packages and Java install successfully.
+
+The Dockerfile now writes the XtraDeb APT source directly and uses the bundled public key `keys/xtradeb-apps.asc` through `Signed-By`.[14][15] Builds no longer need the Launchpad API or a keyserver lookup. The key fingerprint is **`5301FA4FD93244FBC6F6149982BB6851C64F6880`**, as published by Launchpad.[14] APT verifies the repository's signatures with this scoped key.
+
+During package installation, APT uses IPv4, three retries and 30-second network inactivity timeouts. These temporary network settings are removed before the image layer finishes.[16] Ubuntu mirrors, the PPA package server and the JetBrains download server still need to be reachable. Port publishing does not change build-time network connectivity.
+
+Pull the update and rerun `bash setup.sh` from your existing clone. Browser credentials and projects under `/config` are retained. If a new error identifies a package server rather than the Launchpad API, troubleshoot connectivity to that named server.
+
 ## 2. Upgrade an existing installation
 
 Save your work. From the repository directory in the **Ubuntu host terminal**:
@@ -191,7 +201,7 @@ To update IntelliJ, set an available `IDEA_VERSION` in `.env`, run `docker compo
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
-The workflow builds native AMD64 and ARM64 images, validates Compose and the 90% resource calculation, launches graphical IntelliJ and Chromium windows, checks authentication and host Docker access, and verifies that the default launcher leaves vendor VM options untouched. See [workflow runs](https://github.com/WaqasSaleem97/Intellij-Idea-docker/actions/workflows/validate.yml).
+The workflow builds native AMD64 and ARM64 images with Launchpad API and keyserver names mapped to loopback, checks the bundled PPA key fingerprint, validates Compose and the 90% resource calculation, launches graphical IntelliJ and Chromium windows, checks authentication and host Docker access, and verifies that the default launcher leaves vendor VM options untouched. See [workflow runs](https://github.com/WaqasSaleem97/Intellij-Idea-docker/actions/workflows/validate.yml).
 
 An [unchanged AMD64 baseline build](https://github.com/WaqasSaleem97/Intellij-Idea-docker/actions/runs/40916411973) of the previous Dockerfile measured **8.50 GB**, compared with **8.04 GB** for this image: about **457 MB (5.4%) less uncompressed image storage** with Chromium included. The reduction is modest because IntelliJ and its bundled runtime account for much of the installation. Removing the optional browser can reduce the image further; that variant is not included in these measurements.
 
@@ -212,6 +222,9 @@ The storage comparison was measured on 29 October 2026. It excludes build cache 
 11. [Docker local logging and rotation][11]
 12. [Docker Compose port syntax and host interfaces][12]
 13. [GNU tar extraction checkpoints][13]
+14. [XtraDeb PPA source and signing-key fingerprint][14]
+15. [APT source files and scoped signing keys][15]
+16. [APT network retries, timeouts and IPv4][16]
 
 [1]: https://docs.linuxserver.io/images/docker-baseimage-selkies/
 [2]: https://docs.linuxserver.io/selkies/developer-guide/building-images/
@@ -226,3 +239,6 @@ The storage comparison was measured on 29 October 2026. It excludes build cache 
 [11]: https://docs.docker.com/engine/logging/drivers/local/
 [12]: https://docs.docker.com/reference/compose-file/services/#ports
 [13]: https://www.gnu.org/software/tar/manual/html_section/checkpoints.html
+[14]: https://launchpad.net/~xtradeb/+archive/ubuntu/apps
+[15]: https://manpages.ubuntu.com/manpages/resolute/man5/sources.list.5.html
+[16]: https://manpages.ubuntu.com/manpages/resolute/man5/apt.conf.5.html

@@ -9,6 +9,7 @@ on:
       - '*.desktop'
       - '.dockerignore'
       - 'root/**'
+      - 'keys/**'
       - 'tests/**'
       - '.github/workflows/validate.yml'
   pull_request:
@@ -19,6 +20,7 @@ on:
       - '*.desktop'
       - '.dockerignore'
       - 'root/**'
+      - 'keys/**'
       - 'tests/**'
       - '.github/workflows/validate.yml'
   workflow_dispatch:
@@ -47,6 +49,10 @@ jobs:
         run: |
           find . -name '*.sh' -not -path './.git/*' -exec bash -n {} \;
           python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Check bundled PPA signing key
+        run: |
+          fingerprint="$(gpg --batch --show-keys --with-colons keys/xtradeb-apps.asc | awk -F: '$1 == "pub" { primary = 1 } $1 == "fpr" && primary { print $10; primary = 0 }')"
+          test "$fingerprint" = '5301FA4FD93244FBC6F6149982BB6851C64F6880'
       - name: Check Compose configuration
         env:
           PUID: '1001'
@@ -56,7 +62,11 @@ jobs:
           printf 'PUID=%s\nPGID=%s\nWEBTOP_PASSWORD=%s\n' "$PUID" "$PGID" "$WEBTOP_PASSWORD" > .env
           bash resources.sh --configure-only
           docker compose config --quiet
-      - name: Build native image
-        run: docker build --progress=plain -t intellij-lean:ci .
+      - name: Build without Launchpad API or keyserver access
+        run: |
+          docker build --progress=plain \
+            --add-host=api.launchpad.net:127.0.0.1 \
+            --add-host=keyserver.ubuntu.com:127.0.0.1 \
+            -t intellij-lean:ci .
       - name: Launch and check the desktop
         run: bash tests/smoke.sh intellij-lean:ci
