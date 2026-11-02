@@ -22,7 +22,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "3000:3000"
-      - "127.0.0.1:3001:3001"
+      - "3001:3001"
     shm_size: "1gb"
     cpus: "${IDEA_CPU_LIMIT:?Run bash setup.sh first}"
     mem_limit: "${IDEA_MEMORY_LIMIT:?Run bash setup.sh first}"
