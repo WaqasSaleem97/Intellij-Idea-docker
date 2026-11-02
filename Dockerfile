@@ -32,8 +32,12 @@ RUN set -eu; \
     curl -fL --retry 3 -o "$archive" "https://download.jetbrains.com/idea/$archive"; \
     curl -fL --retry 3 -o "$archive.sha256" "https://download.jetbrains.com/idea/$archive.sha256"; \
     sha256sum -c "$archive.sha256"; \
+    printf '\nChecksum verified. Unpacking IntelliJ IDEA; this can take several minutes on slower storage.\n'; \
     mkdir -p /opt/idea; \
-    tar -xzf "$archive" -C /opt/idea --strip-components=1; \
+    tar -xzf "$archive" -C /opt/idea --strip-components=1 \
+        --checkpoint=10000 \
+        --checkpoint-action='echo=Unpacking IntelliJ: %u archive records read'; \
+    printf 'IntelliJ IDEA extraction complete.\n'; \
     rm "$archive" "$archive.sha256"; \
     jdk_dir="$(dirname "$(dirname "$(readlink -f /usr/bin/javac)")")"; \
     ln -s "$jdk_dir" /opt/jdk; \

@@ -1,6 +1,6 @@
 # IntelliJ IDEA in Docker on Ubuntu
 
-Updated 30 October 2026. Run IntelliJ IDEA 2026.2.3 through your browser with an Ubuntu container, an Openbox desktop, Git, a headless JDK 21 and Chromium. Native **ARM64 and AMD64** builds are supported, including Oracle Ampere hosts.
+Updated 2 November 2026. Run IntelliJ IDEA 2026.2.3 through your browser with an Ubuntu container, an Openbox desktop, Git, a headless JDK 21 and Chromium. Native **ARM64 and AMD64** builds are supported, including Oracle Ampere hosts.
 
 ## Smaller image with 90% resource access
 
@@ -45,6 +45,10 @@ Setup calculates the 90% CPU/RAM allowance on every run, including when upgradin
 
 The build selects the native JetBrains installer and verifies its SHA-256 checksum before extraction. The compressed installer is removed in the same layer. The IDE version stays pinned; the base tag receives upstream updates when rebuilt with `--pull`.
 
+On the first build, the installer download can be about 1.5 GB. After `idea-…tar.gz: OK`, the build unpacks the archive; this can take several minutes on slower disks. The build now prints an extraction-start message, archive-read checkpoints and an extraction-complete message.[13] Published ports apply when the service starts, after the image is built.
+
+If extraction stops making progress, use a second Ubuntu host terminal to check available storage with `df -h /` and memory with `free -h`. Keep any actual error output for troubleshooting. A missing Buildx plugin warning can report a fallback to the classic builder while the build continues. Look for an actual error and the last operation shown before diagnosing a failed build.
+
 ## 2. Upgrade an existing installation
 
 Save your work. From the repository directory in the **Ubuntu host terminal**:
@@ -62,12 +66,22 @@ Old images and build cache can remain on disk after rebuilding. Setup does not d
 
 Open **https://localhost:3001** in your host browser, acknowledge the local self-signed certificate notice, and sign in as `admin` with your chosen password. Use `WEBTOP_USER` for a custom login. HTTPS is required for the streaming browser features.[1]
 
+The port mappings are:
+
+```yaml
+ports:
+  - "3000:3000"
+  - "127.0.0.1:3001:3001"
+```
+
+Port **3000 is HTTP** and port **3001 is HTTPS**.[5] HTTP port 3000 is published on all host interfaces because its mapping omits the host IP.[12] HTTPS port 3001 keeps its existing localhost binding. Use HTTPS for the desktop's streaming browser features and your existing tunnel when accessing HTTPS on a remote host.
+
 IntelliJ opens automatically. **Right-click the empty desktop**, or press **Alt+F1** inside the session, for the **Development** menu: IntelliJ IDEA, Terminal and Browser. Alt+F1 also opens the menu when the IDE covers the desktop. Run `idea` in the desktop terminal to reopen the IDE.
 
 - Create or clone projects under **`/config/IdeaProjects`**.
 - For Java 21 projects, select **JDK 21**, or add **`/opt/jdk`** as the project SDK. The compiler is included; no `JAVA_HOME` exports are needed.
 - Use the JDK required by each project's build-tool version. Older Gradle wrappers can need an older JDK; IntelliJ can download project SDKs separately.
-- Open **Browser** from the menu, or run `browser` in the desktop terminal. A container application listening on port 4000 is available there at **http://localhost:4000**. Only desktop port 3001 is published to host loopback.
+- Open **Browser** from the menu, or run `browser` in the desktop terminal. A container application listening on port 4000 is available there at **http://localhost:4000**. HTTP desktop port 3000 is published on all host interfaces; HTTPS desktop port 3001 is published to host loopback. Application port 4000 is accessed inside the container browser.
 
 Free core features and subscription/trial requirements follow JetBrains' licensing.[8]
 
@@ -196,6 +210,8 @@ The storage comparison was measured on 29 October 2026. It excludes build cache 
 9. [Docker Compose environment interpolation][9]
 10. [Docker socket permissions and privileges][10]
 11. [Docker local logging and rotation][11]
+12. [Docker Compose port syntax and host interfaces][12]
+13. [GNU tar extraction checkpoints][13]
 
 [1]: https://docs.linuxserver.io/images/docker-baseimage-selkies/
 [2]: https://docs.linuxserver.io/selkies/developer-guide/building-images/
@@ -208,3 +224,5 @@ The storage comparison was measured on 29 October 2026. It excludes build cache 
 [9]: https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/
 [10]: https://docs.docker.com/engine/install/linux-postinstall/
 [11]: https://docs.docker.com/engine/logging/drivers/local/
+[12]: https://docs.docker.com/reference/compose-file/services/#ports
+[13]: https://www.gnu.org/software/tar/manual/html_section/checkpoints.html
